@@ -1,0 +1,22 @@
+services:
+  db_utc:
+    container_name: db_utc
+    image: postgres:13.0
+    restart: unless-stopped
+    ports:
+      - "7654:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    command: ["postgres", "-c", "log_statement=all"]
+
+  db_east:
+    container_name: db_east
+    image: postgres:13.0
+    restart: unless-stopped
+    ports:
+      - "6543:5432"
+    environment:
+      TZ: "US/Eastern"
+      PGTZ: "US/Eastern"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    command: ["postgres", "-c", "log_statement=all"]
