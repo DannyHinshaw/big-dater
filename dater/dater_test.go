@@ -1,17 +1,73 @@
-package main
+package dater_test
 
 import (
 	"database/sql"
 	"log"
+	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-txdb"
 	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/dannyhinshaw/big-dater/dater"
 	"github.com/dannyhinshaw/big-dater/db"
 )
 
-func main() {
+const (
+	txdbKeyEST = "txdbEST"
+	txdbKeyPST = "txdbPST"
+	txdbKeyUTC = "txdbUTC"
+)
+
+type PostgresTimezonesTestSuite struct {
+	suite.Suite
+	storeEST *dater.Store
+	storePST *dater.Store
+	storeUTC *dater.Store
+}
+
+func TestPostgresTimezonesTestSuite(t *testing.T) {
+	txdb.Register(txdbKeyEST, "postgres", db.ConnEST)
+	txdb.Register(txdbKeyPST, "postgres", db.ConnPST)
+	txdb.Register(txdbKeyUTC, "postgres", db.ConnUTC)
+
+	suite.Run(t, new(PostgresTimezonesTestSuite))
+}
+
+func (suite *PostgresTimezonesTestSuite) SetupTest() {
+	dbEST, err := sql.Open(txdbKeyEST, db.ConnEST)
+	if err != nil {
+		log.Fatalln("unable to connect to est database:", err)
+	}
+
+	dbPST, err := sql.Open(txdbKeyPST, db.ConnPST)
+	if err != nil {
+		log.Fatalln("unable to connect to pst database:", err)
+	}
+
+	dbUTC, err := sql.Open(txdbKeyUTC, db.ConnUTC)
+	if err != nil {
+		log.Fatalln("unable to connect to utc database:", err)
+	}
+
+	suite.storeEST = dater.NewStore(dbEST)
+	if err := suite.storeEST.CreateTables(); err != nil {
+		log.Fatalln("error creating tables for est db:", err)
+	}
+
+	suite.storePST = dater.NewStore(dbPST)
+	if err := suite.storePST.CreateTables(); err != nil {
+		log.Fatalln("error creating tables for pst db:", err)
+	}
+
+	suite.storeUTC = dater.NewStore(dbUTC)
+	if err := suite.storeUTC.CreateTables(); err != nil {
+		log.Fatalln("error creating tables for utc db:", err)
+	}
+}
+
+func (suite *PostgresTimezonesTestSuite) Test_Timezones() {
 	var err error
 	var id int64
 
@@ -20,36 +76,6 @@ func main() {
 
 	now := time.Now()
 
-	dbEST, err := sql.Open("postgres", db.ConnEST)
-	if err != nil {
-		log.Fatalln("unable to connect to est database:", err)
-	}
-
-	dbPST, err := sql.Open("postgres", db.ConnPST)
-	if err != nil {
-		log.Fatalln("unable to connect to pst database:", err)
-	}
-
-	dbUTC, err := sql.Open("postgres", db.ConnUTC)
-	if err != nil {
-		log.Fatalln("unable to connect to utc database:", err)
-	}
-
-	storeEST := dater.NewStore(dbEST)
-	if err := storeEST.CreateTables(); err != nil {
-		log.Fatalln("error creating tables for est db:", err)
-	}
-
-	storePST := dater.NewStore(dbPST)
-	if err := storePST.CreateTables(); err != nil {
-		log.Fatalln("error creating tables for pst db:", err)
-	}
-
-	storeUTC := dater.NewStore(dbUTC)
-	if err := storeUTC.CreateTables(); err != nil {
-		log.Fatalln("error creating tables for utc db:", err)
-	}
-
 	/*
 		EST Data
 	*/
@@ -57,24 +83,24 @@ func main() {
 	origin = dater.OriginEST
 	target = db.TargetStr(origin, dater.WithZone{})
 
-	id, err = storeEST.InsertWithZone(dater.OriginEST, now)
+	id, err = suite.storeEST.InsertWithZone(dater.OriginEST, now)
 	if err != nil {
 		log.Fatalf("error inserting %s row: %s", target, err)
 	}
 
-	estWithZone, err := storeEST.GetWithZoneByID(id)
+	estWithZone, err := suite.storeEST.GetWithZoneByID(id)
 	if err != nil {
 		log.Fatalf("error getting %s row with id %d: %s", target, id, err)
 	}
 
 	target = db.TargetStr(origin, dater.NoZone{})
 
-	id, err = storeEST.InsertNoZone(dater.OriginEST, now)
+	id, err = suite.storeEST.InsertNoZone(dater.OriginEST, now)
 	if err != nil {
 		log.Fatalf("error inserting %s row: %s", target, err)
 	}
 
-	estNoZone, err := storeEST.GetNoZoneByID(id)
+	estNoZone, err := suite.storeEST.GetNoZoneByID(id)
 	if err != nil {
 		log.Fatalf("error getting %s row with id %d: %s", target, id, err)
 	}
@@ -89,24 +115,24 @@ func main() {
 	origin = dater.OriginPST
 	target = db.TargetStr(origin, dater.WithZone{})
 
-	id, err = storePST.InsertWithZone(origin, now)
+	id, err = suite.storePST.InsertWithZone(origin, now)
 	if err != nil {
 		log.Fatalf("error inserting %s row: %s", target, err)
 	}
 
-	pstWithZone, err := storePST.GetWithZoneByID(id)
+	pstWithZone, err := suite.storePST.GetWithZoneByID(id)
 	if err != nil {
 		log.Fatalf("error getting %s row with id %d: %s", target, id, err)
 	}
 
 	target = db.TargetStr(origin, dater.NoZone{})
 
-	id, err = storePST.InsertNoZone(origin, now)
+	id, err = suite.storePST.InsertNoZone(origin, now)
 	if err != nil {
 		log.Fatalf("error inserting %s row: %s", target, err)
 	}
 
-	pstNoZone, err := storePST.GetNoZoneByID(id)
+	pstNoZone, err := suite.storePST.GetNoZoneByID(id)
 	if err != nil {
 		log.Fatalf("error getting %s row with id %d: %s", target, id, err)
 	}
@@ -121,24 +147,24 @@ func main() {
 	origin = dater.OriginUTC
 	target = db.TargetStr(origin, dater.WithZone{})
 
-	id, err = storeUTC.InsertWithZone(origin, now)
+	id, err = suite.storeUTC.InsertWithZone(origin, now)
 	if err != nil {
 		log.Fatalf("error inserting %s row: %s", target, err)
 	}
 
-	utcWithZone, err := storeUTC.GetWithZoneByID(id)
+	utcWithZone, err := suite.storeUTC.GetWithZoneByID(id)
 	if err != nil {
 		log.Fatalf("error getting %s row with id %d: %s", target, id, err)
 	}
 
 	target = db.TargetStr(origin, dater.NoZone{})
 
-	id, err = storeUTC.InsertNoZone(origin, now)
+	id, err = suite.storeUTC.InsertNoZone(origin, now)
 	if err != nil {
 		log.Fatalf("error inserting %s row: %s", target, err)
 	}
 
-	utcNoZone, err := storeUTC.GetNoZoneByID(id)
+	utcNoZone, err := suite.storeUTC.GetNoZoneByID(id)
 	if err != nil {
 		log.Fatalf("error getting %s row with id %d: %s", target, id, err)
 	}

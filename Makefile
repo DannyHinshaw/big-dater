@@ -1,3 +1,8 @@
+.PHONY: test
+
+test:
+	go test -v ./...
+
 compose-up:
 	@docker compose up --build -d --remove-orphans
 
