@@ -1,7 +1,10 @@
-.PHONY: test
+.PHONY: run test
+
+run:
+	@go run main.go
 
 test:
-	go test -v ./...
+	@go test -v ./...
 
 compose-up:
 	@docker compose up --build -d --remove-orphans
